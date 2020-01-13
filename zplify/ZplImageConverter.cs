@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -80,16 +78,14 @@ namespace zplify
         }
         public string BuildLabel(Image image)
         {
-            using (var bmp = ScaleBitmap(image))
-            {
-                var widthBytes = GetImageWidthInBytes(bmp);
-                var total = widthBytes * bmp.Height;
-                var body = ConvertBitmapToHex(bmp);
-                return "^XA^FO0,0" // Start of header
-                     + "^GFA," + total + "," + total + "," + widthBytes + "," // Graphic line declaration
-                     + CompressHex(body, widthBytes) // Hex body compressed
-                     + "^FS^XZ"; // closing
-            }
+            using var bmp = ScaleBitmap(image);
+            var widthBytes = GetImageWidthInBytes(bmp);
+            var total = widthBytes * bmp.Height;
+            var body = ConvertBitmapToHex(bmp);
+            return "^XA^FO0,0" // Start of header
+                 + "^GFA," + total + "," + total + "," + widthBytes + "," // Graphic line declaration
+                 + CompressHex(body, widthBytes) // Hex body compressed
+                 + "^FS^XZ"; // closing
         }
         public Bitmap ScaleBitmap(Image image)
         {
@@ -150,7 +146,7 @@ namespace zplify
             int maxLineLength = widthBytes * 2;
 
             var sbCode = new StringBuilder();
-            var sbLinea = new StringBuilder();
+            var sbLinea = new StringBuilder(maxLineLength);
             string previousLine = null;
             var counter = 1;
             var firstChar = code[0];

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.IO;
+using System.Text;
 
 namespace zplify
 {
@@ -8,31 +9,47 @@ namespace zplify
     {
         internal static void Main(string[] args)
         {
+            var arguments = ArgumentParser.Parse(args, out var error);
+            if (error != null)
+            {
+                Console.WriteLine(error);
+                return;
+            }
             if (args.Length == 0)
             {
-                Console.WriteLine("Please provide argument. --help for more details");
+                var ms = new MemoryStream();
+                using (Stream stdin = Console.OpenStandardInput())
+                {
+                    var buffer = new byte[2048];
+                    int bytes;
+                    while ((bytes = stdin.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        ms.Write(buffer, 0, bytes);
+                    }
+                }
+                if (ms.Length > 0)
+                {
+                    CreateLabel(new Bitmap(ms), 0, 0, null);
+                }
+                else
+                {
+                    Console.WriteLine("Please provide argument. --help for more details");
+                }
             }
             else
             {
-                var arguments = ArgumentParser.Parse(args, out var error);
-                if (error != null)
-                {
-                    Console.WriteLine(error);
-                    return;
-                }
-                CreateLabel(arguments);
+                CreateLabel(new Bitmap(arguments.InPath), arguments.Width, arguments.Length, arguments.OutPath);
             }
         }
-        private static void CreateLabel(Arguments args)
+        private static void CreateLabel(Bitmap file, int width, int length, string outPath)
         {
-            var file = new Bitmap(args.InPath);
 
-            var converter = args.Width > 0 && args.Length > 0
-                ? new ZplImageConverter(args.Length, args.Width)
+            var converter = width > 0 && length > 0
+                ? new ZplImageConverter(length, width)
                 : new ZplImageConverter();
-            if (args.OutPath != null)
+            if (outPath != null)
             {
-                File.WriteAllText(args.OutPath, converter.BuildLabel(file));
+                File.WriteAllText(outPath, converter.BuildLabel(file));
             }
             else
             {

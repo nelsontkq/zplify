@@ -1,6 +1,3 @@
-using System;
-using System.Drawing;
-
 namespace zplify
 {
     public class Arguments
