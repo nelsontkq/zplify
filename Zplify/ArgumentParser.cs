@@ -11,7 +11,6 @@ namespace Zplify
             errorMsg = null;
 
             for (var i = 0; i < args.Length; i++)
-            {
                 if (args[i][0] == '-')
                 {
                     var startIndex = 1;
@@ -41,7 +40,6 @@ namespace Zplify
                     errorMsg = "Invalid formatted argument";
                     return a;
                 }
-            }
 
             return a;
         }

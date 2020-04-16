@@ -1,13 +1,9 @@
-﻿using System;
-using System.Drawing;
-using System.Security.Cryptography;
-using BenchmarkDotNet.Reports;
-using BenchmarkDotNet.Running;
+﻿using BenchmarkDotNet.Running;
 
 namespace Zplify.Benchmark
 {
     /// <summary>
-    /// Benchmark 
+    ///     Benchmark
     /// </summary>
     public class Program
     {

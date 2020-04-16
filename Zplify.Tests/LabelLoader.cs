@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -10,7 +9,7 @@ namespace Zplify.Tests
     {
         public IEnumerator<object[]> GetEnumerator()
         {
-           return Directory.GetFiles("Data").Select(e => new object[] { e }).GetEnumerator();
+            return Directory.GetFiles("Data").Select(e => new object[] {e}).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()

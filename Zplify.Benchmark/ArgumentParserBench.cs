@@ -4,7 +4,7 @@ namespace Zplify.Benchmark
 {
     public class ArgumentParserBench
     {
-        [Params(new []{ "--help"}, new []{ "--length", "1200", "--width", "800", "-o", "."})]
+        [Params(new[] {"--help"}, new[] {"--length", "1200", "--width", "800", "-o", "."})]
         public string[] arguments;
 
         [Benchmark]

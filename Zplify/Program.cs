@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Drawing;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Zplify
@@ -17,13 +16,11 @@ namespace Zplify
                 await using var ms = new MemoryStream();
                 redirectedInput = true;
                 await Console.OpenStandardInput().CopyToAsync(ms);
-                if (ms.Length == 0)
-                {
-                    Console.WriteLine("Timed out trying to read from stdin.");
-                }
+                if (ms.Length == 0) Console.WriteLine("Timed out trying to read from stdin.");
                 ms.Seek(0, SeekOrigin.Begin);
                 file = new Bitmap(ms);
             }
+
             if (!redirectedInput && args.Length == 0)
             {
                 Console.WriteLine("Please provide argument. --help for more details");
@@ -36,6 +33,7 @@ namespace Zplify
                     Console.WriteLine("please provide file path argument or pipe file to stdin.");
                     return;
                 }
+
                 if (error is null)
                 {
                     using var bitmap = file ??= new Bitmap(arguments.InPath);
