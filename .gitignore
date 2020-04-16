@@ -4,9 +4,15 @@ project.lock.json
 .DS_Store
 *.pyc
 
+#Intellij
+
 # Visual Studio Code
 .vscode
 *.code-workspace
+
+#Jetbrains
+.idea/
+**/*.Dotsettings.user
 
 # User-specific files
 *.suo
