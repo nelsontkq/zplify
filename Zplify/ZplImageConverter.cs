@@ -91,20 +91,16 @@ namespace Zplify
             return result;
         }
 
-        public string BuildLabel(Image image)
+        public string BuildLabel(Bitmap image)
         {
             using var bmp = ScaleBitmap(image);
             var widthBytes = GetImageWidthInBytes(bmp);
             var total = widthBytes * bmp.Height;
-            var body = ConvertBitmapToHex(bmp);
             return "^XA^FO0,0" // Start of header
-                   +
-                   string.Join(',', "^GFA", total, total, widthBytes) +
-                   "," // Graphic line declaration
-                   +
-                   CompressHex(body, widthBytes) // Hex body compressed
-                   +
-                   "^FS^XZ"; // closing
+                   + string.Join(',', "^GFA", total, total, widthBytes)
+                   + "," // Graphic line declaration
+                   + CompressHex(ConvertBitmapToHex(bmp), widthBytes) // Hex body compressed
+                   + "^FS^XZ"; // closing
         }
 
         private unsafe string ByteArrayToHex(byte[] bytes)
@@ -122,14 +118,16 @@ namespace Zplify
         }
 
 
-        private Bitmap ScaleBitmap(Image image)
+        private Bitmap ScaleBitmap(Bitmap image)
         {
-            var bitmap = new Bitmap(image, _width, _length);
+            if (image.Width == _width && image.Height == _length) 
+                return image;
+            var bitmap = new Bitmap(_width, _length);
             using (var g = Graphics.FromImage(bitmap))
             {
                 g.InterpolationMode = InterpolationMode.Bicubic;
+                g.DrawImage(image, 0, 0, _width, _length);
             }
-
             return bitmap;
         }
 
@@ -190,7 +188,10 @@ namespace Zplify
                     else if (counter >= maxLineLength - 1 && firstChar == 'F')
                         sbLinea.Append("!");
                     else
-                        sbLinea.Append(MapHex[counter - 1] + firstChar);
+                    {
+                        sbLinea.Append(MapHex[counter - 1]);
+                        sbLinea.Append(firstChar);
+                    }
                     if (sbLinea.ToString().Equals(previousLine))
                         sbCode.Append(":");
                     else
