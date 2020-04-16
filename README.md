@@ -1,4 +1,4 @@
-# zplify
+# Zplify
 
 Allows for the creation of a ZPL label parsable by a zebra printer out of an image file.  
 
