@@ -1,18 +1,20 @@
 # Zplify
 
-Allows for the creation of a ZPL label string out of an image file.  
+Allows for the creation of a ZPL label string out of an image file.
 
 Prints directly to the console unless -o or --output is provided, then it will save the zpl to the
-target file.  
+target file.
 
 ## Options
 
-The full list of available options are as follows:  
+The full list of available options are as follows:
 
+```shell
 -l --length    Set the length of the label in pixels. 1200px is default.  
 -w --width     Set the width of the label in pixels. 800px is default.  
 -o --output    Set the output path. If omitted, the label will output to the terminal  
 -h --help      Display this message  
+```
 
 ## Example usage
 
@@ -29,4 +31,12 @@ The full list of available options are as follows:
 ```shell
 # pipe input from URL, convert to ZPL and send to printer
 wget -O www.example.com/label.png | ./zplify | lpr -P printer_name
+```
+
+## System requirements
+
+### macOS
+App requires libgdiplus. You can install with brew:
+```shell
+brew install mono-libgdiplus
 ```

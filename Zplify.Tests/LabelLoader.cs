@@ -9,7 +9,7 @@ namespace Zplify.Tests
     {
         public IEnumerator<object[]> GetEnumerator()
         {
-            return Directory.GetFiles("Data").Select(e => new object[] {e}).GetEnumerator();
+            return Directory.GetFiles("Data").Where(e => Path.GetExtension(e) == ".png").Select(e => new object[] {e}).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()

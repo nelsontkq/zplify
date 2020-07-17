@@ -12,7 +12,7 @@ namespace Zplify
         private static readonly uint[] Lookup32Unsafe = CreateHexLookup();
 
         private static readonly unsafe uint* Lookup32UnsafeP
-            = (uint*) GCHandle.Alloc(Lookup32Unsafe, GCHandleType.Pinned).AddrOfPinnedObject();
+            = (uint*)GCHandle.Alloc(Lookup32Unsafe, GCHandleType.Pinned).AddrOfPinnedObject();
 
         private static readonly string[] MapHex =
         {
@@ -42,18 +42,18 @@ namespace Zplify
             "zX", "zY"
         };
 
-        private readonly int _length;
+        private readonly int _height;
         private readonly int _width;
 
         public ZplImageConverter()
         {
-            _length = 1200;
+            _height = 1200;
             _width = 800;
         }
 
         public ZplImageConverter(int length, int width)
         {
-            _length = length;
+            _height = length;
             _width = width;
         }
 
@@ -83,9 +83,9 @@ namespace Zplify
             {
                 var s = i.ToString("X2");
                 if (BitConverter.IsLittleEndian)
-                    result[i] = s[0] + ((uint) s[1] << 16);
+                    result[i] = s[0] + ((uint)s[1] << 16);
                 else
-                    result[i] = s[1] + ((uint) s[0] << 16);
+                    result[i] = s[1] + ((uint)s[0] << 16);
             }
 
             return result;
@@ -93,7 +93,7 @@ namespace Zplify
 
         public string BuildLabel(Image image)
         {
-            using var bmp = ScaleBitmap(image);
+            using var bmp = ScaleAndRotateBitmap(image);
             var widthBytes = GetImageWidthInBytes(bmp);
             var total = widthBytes * bmp.Height;
             var body = ConvertBitmapToHex(bmp);
@@ -114,7 +114,7 @@ namespace Zplify
             fixed (byte* bytesP = bytes)
             fixed (char* resultP = result)
             {
-                var resultP2 = (uint*) resultP;
+                var resultP2 = (uint*)resultP;
                 for (var i = 0; i < bytes.Length; i++) resultP2[i] = lookupP[bytesP[i]];
             }
 
@@ -122,14 +122,19 @@ namespace Zplify
         }
 
 
-        private Bitmap ScaleBitmap(Image image)
+        private Bitmap ScaleAndRotateBitmap(Image image)
         {
-            var bitmap = new Bitmap(image, _width, _length);
+            var currentDimensions = Math.Abs(image.Width - _width) + Math.Abs(image.Height - _height);
+            var rotated = Math.Abs(image.Height - _width) + Math.Abs(image.Width - _height);
+            if (rotated < currentDimensions)
+            {
+                image.RotateFlip(RotateFlipType.Rotate90FlipNone);
+            }
+            var bitmap = new Bitmap(image, _width, _height);
             using (var g = Graphics.FromImage(bitmap))
             {
                 g.InterpolationMode = InterpolationMode.Bicubic;
             }
-
             return bitmap;
         }
 
@@ -153,21 +158,21 @@ namespace Zplify
             var bytes = new byte[originalImage.Height * originalImage.Width / 8];
             var i = 0;
             for (var h = 0; h < originalImage.Height; h++)
-            for (var w = 0; w < originalImage.Width; w++)
-            {
-                var rgb = originalImage.GetPixel(w, h);
-                var totalColor = (rgb.R + rgb.G + rgb.B) / 3;
-
-                if (totalColor < BLACK_LIMIT && rgb.A >= BLACK_LIMIT) current |= 1 << index;
-                index--;
-
-                if (index == -1 || w == originalImage.Width - 1)
+                for (var w = 0; w < originalImage.Width; w++)
                 {
-                    bytes[i++] = (byte) current;
-                    index = 7;
-                    current = 0b0000_0000;
+                    var rgb = originalImage.GetPixel(w, h);
+                    var totalColor = (rgb.R + rgb.G + rgb.B) / 3;
+
+                    if (totalColor < BLACK_LIMIT && rgb.A >= BLACK_LIMIT) current |= 1 << index;
+                    index--;
+
+                    if (index == -1 || w == originalImage.Width - 1)
+                    {
+                        bytes[i++] = (byte)current;
+                        index = 7;
+                        current = 0b0000_0000;
+                    }
                 }
-            }
 
             return ByteArrayToHex(bytes);
         }
