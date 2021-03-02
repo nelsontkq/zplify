@@ -45,6 +45,8 @@ namespace Zplify
         private readonly int _height;
         private readonly int _width;
 
+        public InterpolationMode InterpolationMode { get; set; }
+
         public ZplImageConverter()
         {
             _height = 1200;
@@ -124,18 +126,22 @@ namespace Zplify
 
         private Bitmap ScaleAndRotateBitmap(Image image)
         {
+            // Rotate widest side
             var currentDimensions = Math.Abs(image.Width - _width) + Math.Abs(image.Height - _height);
             var rotated = Math.Abs(image.Height - _width) + Math.Abs(image.Width - _height);
             if (rotated < currentDimensions)
             {
                 image.RotateFlip(RotateFlipType.Rotate90FlipNone);
             }
-            var bitmap = new Bitmap(image, _width, _height);
-            using (var g = Graphics.FromImage(bitmap))
+
+            // Scale image
+            var bmp = new Bitmap(_width, _height);
+            using (Graphics g = Graphics.FromImage(bmp))
             {
-                g.InterpolationMode = InterpolationMode.Bicubic;
+                g.InterpolationMode = InterpolationMode;
+                g.DrawImage(image, 0, 0, _width, _height);
             }
-            return bitmap;
+            return bmp;
         }
 
         private int GetImageWidthInBytes(Bitmap originalImage)
