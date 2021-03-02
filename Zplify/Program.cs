@@ -51,6 +51,7 @@ namespace Zplify
             var converter = args.Width > 0 && args.Length > 0
                 ? new ZplImageConverter(args.Length, args.Width)
                 : new ZplImageConverter();
+            converter.InterpolationMode = args.InterpolationMode;
             if (args.OutPath != null)
                 File.WriteAllText(args.OutPath, converter.BuildLabel(file));
             else
