@@ -1,6 +1,6 @@
-# Zplify - PNG to ZPL converter
+# Zplify - Image to ZPL converter
 
-Convert a PNG image to ZPL for a Zebra printer.
+Convert PNG, JPG, or any supported image type to ZPL for a Zebra printer.
 
 Prints the ZPL directly to the console unless -o or --output is provided, then it will save the zpl to the
 target file.
