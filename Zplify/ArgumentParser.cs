@@ -82,17 +82,6 @@ namespace Zplify
                     }
 
                     break;
-                case "i":
-                case "interpolation-mode":
-                    if (int.TryParse(value, out var interpolationMode))
-                    {
-                        arguments.InterpolationMode = (System.Drawing.Drawing2D.InterpolationMode)interpolationMode;
-                    }
-                    else
-                    {
-                        return "Interpolation mode must be numeric";
-                    }
-                    break;
                 case "h":
                 case "help":
                     return "The full list of available options are as follows:\n" +

@@ -1,21 +1,24 @@
 using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Advanced;
+using SixLabors.ImageSharp.PixelFormats;
 using System.Text;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.Processing.Processors.Transforms;
 
-namespace Zplify
+namespace Zplify;
+
+public class ZplImageConverter
 {
-    public class ZplImageConverter
+    private const int BLACK_LIMIT = 125;
+    private static readonly uint[] Lookup32Unsafe = CreateHexLookup();
+
+    private static readonly unsafe uint* Lookup32UnsafeP
+        = (uint*)GCHandle.Alloc(Lookup32Unsafe, GCHandleType.Pinned).AddrOfPinnedObject();
+
+    private static readonly string[] MapHex =
     {
-        private const int BLACK_LIMIT = 125;
-        private static readonly uint[] Lookup32Unsafe = CreateHexLookup();
-
-        private static readonly unsafe uint* Lookup32UnsafeP
-            = (uint*)GCHandle.Alloc(Lookup32Unsafe, GCHandleType.Pinned).AddrOfPinnedObject();
-
-        private static readonly string[] MapHex =
-        {
             "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "g", "gG",
             "gH", "gI", "gJ", "gK", "gL", "gM", "gN", "gO", "gP", "gQ", "gR", "gS", "gT", "gU", "gV", "gW", "gX", "gY",
             "h", "hG", "hH", "hI", "hJ", "hK", "hL", "hM", "hN", "hO", "hP", "hQ", "hR", "hS", "hT", "hU", "hV", "hW",
@@ -42,189 +45,185 @@ namespace Zplify
             "zX", "zY"
         };
 
-        private readonly int _height;
-        private readonly int _width;
+    private readonly int _height;
+    private readonly int _width;
 
-        public InterpolationMode InterpolationMode { get; set; }
+    public ZplImageConverter()
+    {
+        _height = 1200;
+        _width = 800;
+    }
 
-        public ZplImageConverter()
+    public ZplImageConverter(int length, int width)
+    {
+        _height = length;
+        _width = width;
+    }
+
+    // // This generates the above array.
+    // private static string[] CreateHexCompressionMapping()
+    // {
+    //     var returnResult = new string[419];
+    //     const string capitalLetters = "GHIJKLMNOPQRSTUVWXY";
+    //     const string lowercaseLetters = "ghijklmnopqrstuvwxyz";
+    //     var returnIndex = 0;
+    //     for (var i = 0; i < capitalLetters.Length; i++)
+    //         returnResult[returnIndex++] = new string(capitalLetters[i], 1);
+    //     for (var i = 0; i < lowercaseLetters.Length; i++)
+    //     for (var j = 0; j < capitalLetters.Length; j++)
+    //     {
+    //         if (j % 20 == 0) returnResult[returnIndex++] = new string(lowercaseLetters[i], 1);
+    //         returnResult[returnIndex++] = new string(new[] {lowercaseLetters[i], capitalLetters[j]});
+    //     }
+    //
+    //     return returnResult;
+    // }
+
+    private static uint[] CreateHexLookup()
+    {
+        var result = new uint[256];
+        for (var i = 0; i < 256; i++)
         {
-            _height = 1200;
-            _width = 800;
-        }
-
-        public ZplImageConverter(int length, int width)
-        {
-            _height = length;
-            _width = width;
-        }
-
-        // // This generates the above array.
-        // private static string[] CreateHexCompressionMapping()
-        // {
-        //     var returnResult = new string[419];
-        //     const string capitalLetters = "GHIJKLMNOPQRSTUVWXY";
-        //     const string lowercaseLetters = "ghijklmnopqrstuvwxyz";
-        //     var returnIndex = 0;
-        //     for (var i = 0; i < capitalLetters.Length; i++)
-        //         returnResult[returnIndex++] = new string(capitalLetters[i], 1);
-        //     for (var i = 0; i < lowercaseLetters.Length; i++)
-        //     for (var j = 0; j < capitalLetters.Length; j++)
-        //     {
-        //         if (j % 20 == 0) returnResult[returnIndex++] = new string(lowercaseLetters[i], 1);
-        //         returnResult[returnIndex++] = new string(new[] {lowercaseLetters[i], capitalLetters[j]});
-        //     }
-        //
-        //     return returnResult;
-        // }
-
-        private static uint[] CreateHexLookup()
-        {
-            var result = new uint[256];
-            for (var i = 0; i < 256; i++)
-            {
-                var s = i.ToString("X2");
-                if (BitConverter.IsLittleEndian)
-                    result[i] = s[0] + ((uint)s[1] << 16);
-                else
-                    result[i] = s[1] + ((uint)s[0] << 16);
-            }
-
-            return result;
-        }
-
-        public string BuildLabel(Image image)
-        {
-            using var bmp = ScaleAndRotateBitmap(image);
-            var widthBytes = GetImageWidthInBytes(bmp);
-            var total = widthBytes * bmp.Height;
-            var body = ConvertBitmapToHex(bmp);
-            return "^XA^FO0,0" // Start of header
-                   +
-                   string.Join(',', "^GFA", total, total, widthBytes) +
-                   "," // Graphic line declaration
-                   +
-                   CompressHex(body, widthBytes) // Hex body compressed
-                   +
-                   "^FS^XZ"; // closing
-        }
-
-        private unsafe string ByteArrayToHex(byte[] bytes)
-        {
-            var lookupP = Lookup32UnsafeP;
-            var result = new char[bytes.Length * 2];
-            fixed (byte* bytesP = bytes)
-            fixed (char* resultP = result)
-            {
-                var resultP2 = (uint*)resultP;
-                for (var i = 0; i < bytes.Length; i++) resultP2[i] = lookupP[bytesP[i]];
-            }
-
-            return new string(result);
-        }
-
-
-        private Bitmap ScaleAndRotateBitmap(Image image)
-        {
-            // Rotate widest side
-            var currentDimensions = Math.Abs(image.Width - _width) + Math.Abs(image.Height - _height);
-            var rotated = Math.Abs(image.Height - _width) + Math.Abs(image.Width - _height);
-            if (rotated < currentDimensions)
-            {
-                image.RotateFlip(RotateFlipType.Rotate90FlipNone);
-            }
-
-            // Scale image
-            var bmp = new Bitmap(_width, _height);
-            using (Graphics g = Graphics.FromImage(bmp))
-            {
-                g.InterpolationMode = InterpolationMode;
-                g.DrawImage(image, 0, 0, _width, _height);
-            }
-            return bmp;
-        }
-
-        private int GetImageWidthInBytes(Bitmap originalImage)
-        {
-            var width = originalImage.Width;
-            int widthBytes;
-            if (width % 8 > 0)
-                widthBytes = width / 8 + 1;
+            var s = i.ToString("X2");
+            if (BitConverter.IsLittleEndian)
+                result[i] = s[0] + ((uint)s[1] << 16);
             else
-                widthBytes = width / 8;
-            return widthBytes;
+                result[i] = s[1] + ((uint)s[0] << 16);
         }
 
-        private string ConvertBitmapToHex(Bitmap originalImage)
+        return result;
+    }
+
+    public string BuildLabel(Image<Rgba32> image)
+    {
+        var img = ScaleAndRotateImage(image, _width, _height);
+        var widthBytes = GetImageWidthInBytes(img);
+        var total = widthBytes * img.Height;
+        var body = ConvertImageToHex(img);
+        return "^XA^FO0,0" // Start of header
+               +
+               string.Join(',', "^GFA", total, total, widthBytes) +
+               "," // Graphic line declaration
+               +
+               CompressHex(body, widthBytes) // Hex body compressed
+               +
+               "^FS^XZ"; // closing
+    }
+
+    private unsafe string ByteArrayToHex(byte[] bytes)
+    {
+        var lookupP = Lookup32UnsafeP;
+        var result = new char[bytes.Length * 2];
+        fixed (byte* bytesP = bytes)
+        fixed (char* resultP = result)
         {
-            var graphics = Graphics.FromImage(originalImage);
-            graphics.DrawImage(originalImage, 0, 0);
-            var index = 7;
-            var current = 0b0000_0000;
-            var bytes = new byte[originalImage.Height * originalImage.Width / 8];
-            var i = 0;
-            for (var h = 0; h < originalImage.Height; h++)
-                for (var w = 0; w < originalImage.Width; w++)
-                {
-                    var rgb = originalImage.GetPixel(w, h);
-                    var totalColor = (rgb.R + rgb.G + rgb.B) / 3;
-
-                    if (totalColor < BLACK_LIMIT && rgb.A >= BLACK_LIMIT) current |= 1 << index;
-                    index--;
-
-                    if (index == -1 || w == originalImage.Width - 1)
-                    {
-                        bytes[i++] = (byte)current;
-                        index = 7;
-                        current = 0b0000_0000;
-                    }
-                }
-
-            return ByteArrayToHex(bytes);
+            var resultP2 = (uint*)resultP;
+            for (var i = 0; i < bytes.Length; i++) resultP2[i] = lookupP[bytesP[i]];
         }
 
-        private string CompressHex(string code, int widthBytes)
-        {
-            var maxLineLength = widthBytes * 2;
+        return new string(result);
+    }
+    private static Image<Rgba32> ScaleAndRotateImage(Image<Rgba32> image, int width, int height)
+    {
+        bool shouldRotate = Math.Abs(image.Width - width) + Math.Abs(image.Height - height) >
+                            Math.Abs(image.Height - width) + Math.Abs(image.Width - height);
 
-            var sbCode = new StringBuilder();
-            var sbLinea = new StringBuilder();
-            string previousLine = null;
-            var counter = 1;
-            var firstChar = code[0];
-            for (var i = 1; i < code.Length; i++)
+        if (shouldRotate)
+        {
+            image.Mutate(x => x.Rotate(RotateMode.Rotate90));
+        }
+        image.Mutate(x => x.Resize(new ResizeOptions
+        {
+            Size = new Size(width, height),
+            Sampler = new LanczosResampler(3),
+        }));
+        return image;
+    }
+
+    private static int GetImageWidthInBytes(Image<Rgba32> originalImage)
+    {
+        var width = originalImage.Width;
+        int widthBytes;
+        if (width % 8 > 0)
+            widthBytes = width / 8 + 1;
+        else
+            widthBytes = width / 8;
+        return widthBytes;
+    }
+
+    private string ConvertImageToHex(Image<Rgba32> image)
+    {
+        var index = 7;
+        var currentByte = 0b0000_0000;
+        var bytes = new byte[image.Height * image.Width / 8];
+        var byteIndex = 0;
+
+        for (int y = 0; y < image.Height; y++)
+        {
+            for (int x = 0; x < image.Width; x++)
             {
-                if (i % maxLineLength == 0 || i == code.Length - 1)
+                Rgba32 pixel = image[x, y];
+                int avgColor = (pixel.R + pixel.G + pixel.B) / 3;
+
+                if (avgColor < BLACK_LIMIT && pixel.A >= BLACK_LIMIT)
                 {
-                    if (counter >= maxLineLength - 1 && firstChar == '0')
-                        sbLinea.Append(",");
-                    else if (counter >= maxLineLength - 1 && firstChar == 'F')
-                        sbLinea.Append("!");
-                    else
-                        sbLinea.Append(MapHex[counter - 1] + firstChar);
-                    if (sbLinea.ToString().Equals(previousLine))
-                        sbCode.Append(":");
-                    else
-                        sbCode.Append(sbLinea.ToString());
-                    previousLine = sbLinea.ToString();
-                    sbLinea.Clear();
-                    firstChar = code[i];
-                    counter = 0;
+                    currentByte |= (1 << index);
                 }
 
-                if (firstChar == code[i])
+                index--;
+
+                if (index == -1 || x == image.Width - 1)
                 {
-                    counter++;
-                }
-                else
-                {
-                    sbLinea.Append(MapHex[counter - 1] + firstChar);
-                    counter = 1;
-                    firstChar = code[i];
+                    bytes[byteIndex++] = (byte)currentByte;
+                    index = 7;
+                    currentByte = 0b0000_0000;
                 }
             }
-
-            return sbCode.ToString();
         }
+        return ByteArrayToHex(bytes);
+    }
+
+    public static string CompressHex(string code, int widthBytes)
+    {
+        var maxLineLength = widthBytes * 2;
+
+        var sbCode = new StringBuilder();
+        var sbLinea = new StringBuilder();
+        string previousLine = null;
+        var counter = 1;
+        var firstChar = code[0];
+        for (var i = 1; i < code.Length; i++)
+        {
+            if (i % maxLineLength == 0 || i == code.Length - 1)
+            {
+                if (counter >= maxLineLength - 1 && firstChar == '0')
+                    sbLinea.Append(',');
+                else if (counter >= maxLineLength - 1 && firstChar == 'F')
+                    sbLinea.Append('!');
+                else
+                    sbLinea.Append(MapHex[counter - 1] + firstChar);
+                if (sbLinea.ToString().Equals(previousLine))
+                    sbCode.Append(':');
+                else
+                    sbCode.Append(sbLinea);
+                previousLine = sbLinea.ToString();
+                sbLinea.Clear();
+                firstChar = code[i];
+                counter = 0;
+            }
+
+            if (firstChar == code[i])
+            {
+                counter++;
+            }
+            else
+            {
+                sbLinea.Append(MapHex[counter - 1] + firstChar);
+                counter = 1;
+                firstChar = code[i];
+            }
+        }
+
+        return sbCode.ToString();
     }
 }
