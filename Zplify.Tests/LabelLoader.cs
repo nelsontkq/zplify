@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,7 +9,7 @@ namespace Zplify.Tests
     {
         public IEnumerator<object[]> GetEnumerator()
         {
-            return Directory.GetFiles("Data").Where(e => Path.GetExtension(e) == ".png").Select(e => new object[] {e}).GetEnumerator();
+            return Directory.GetFiles("Data").Where(e => Path.GetExtension(e) == ".png").Select(e => new object[] { e.Replace(".png", "", System.StringComparison.OrdinalIgnoreCase) }).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()

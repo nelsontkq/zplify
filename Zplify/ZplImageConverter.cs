@@ -12,10 +12,6 @@ namespace Zplify;
 public class ZplImageConverter
 {
     private const int BLACK_LIMIT = 125;
-    private static readonly uint[] Lookup32Unsafe = CreateHexLookup();
-
-    private static readonly unsafe uint* Lookup32UnsafeP
-        = (uint*)GCHandle.Alloc(Lookup32Unsafe, GCHandleType.Pinned).AddrOfPinnedObject();
 
     private static readonly string[] MapHex =
     {
@@ -60,70 +56,23 @@ public class ZplImageConverter
         _width = width;
     }
 
-    // // This generates the above array.
-    // private static string[] CreateHexCompressionMapping()
-    // {
-    //     var returnResult = new string[419];
-    //     const string capitalLetters = "GHIJKLMNOPQRSTUVWXY";
-    //     const string lowercaseLetters = "ghijklmnopqrstuvwxyz";
-    //     var returnIndex = 0;
-    //     for (var i = 0; i < capitalLetters.Length; i++)
-    //         returnResult[returnIndex++] = new string(capitalLetters[i], 1);
-    //     for (var i = 0; i < lowercaseLetters.Length; i++)
-    //     for (var j = 0; j < capitalLetters.Length; j++)
-    //     {
-    //         if (j % 20 == 0) returnResult[returnIndex++] = new string(lowercaseLetters[i], 1);
-    //         returnResult[returnIndex++] = new string(new[] {lowercaseLetters[i], capitalLetters[j]});
-    //     }
-    //
-    //     return returnResult;
-    // }
-
-    private static uint[] CreateHexLookup()
-    {
-        var result = new uint[256];
-        for (var i = 0; i < 256; i++)
-        {
-            var s = i.ToString("X2");
-            if (BitConverter.IsLittleEndian)
-                result[i] = s[0] + ((uint)s[1] << 16);
-            else
-                result[i] = s[1] + ((uint)s[0] << 16);
-        }
-
-        return result;
-    }
-
     public string BuildLabel(Image<Rgba32> image)
     {
         var img = ScaleAndRotateImage(image, _width, _height);
         var widthBytes = GetImageWidthInBytes(img);
         var total = widthBytes * img.Height;
-        var body = ConvertImageToHex(img);
+        var body = GetImageBytes(img);
         return "^XA^FO0,0" // Start of header
                +
                string.Join(',', "^GFA", total, total, widthBytes) +
                "," // Graphic line declaration
                +
-               CompressHex(body, widthBytes) // Hex body compressed
+               CompressHex(Convert.ToHexString(body), widthBytes)
                +
                "^FS^XZ"; // closing
     }
 
-    private unsafe string ByteArrayToHex(byte[] bytes)
-    {
-        var lookupP = Lookup32UnsafeP;
-        var result = new char[bytes.Length * 2];
-        fixed (byte* bytesP = bytes)
-        fixed (char* resultP = result)
-        {
-            var resultP2 = (uint*)resultP;
-            for (var i = 0; i < bytes.Length; i++) resultP2[i] = lookupP[bytesP[i]];
-        }
-
-        return new string(result);
-    }
-    private static Image<Rgba32> ScaleAndRotateImage(Image<Rgba32> image, int width, int height)
+    public static Image<Rgba32> ScaleAndRotateImage(Image<Rgba32> image, int width, int height)
     {
         bool shouldRotate = Math.Abs(image.Width - width) + Math.Abs(image.Height - height) >
                             Math.Abs(image.Height - width) + Math.Abs(image.Width - height);
@@ -140,7 +89,7 @@ public class ZplImageConverter
         return image;
     }
 
-    private static int GetImageWidthInBytes(Image<Rgba32> originalImage)
+    public static int GetImageWidthInBytes(Image<Rgba32> originalImage)
     {
         var width = originalImage.Width;
         int widthBytes;
@@ -151,7 +100,7 @@ public class ZplImageConverter
         return widthBytes;
     }
 
-    private string ConvertImageToHex(Image<Rgba32> image)
+    public static byte[] GetImageBytes(Image<Rgba32> image)
     {
         var index = 7;
         var currentByte = 0b0000_0000;
@@ -180,7 +129,7 @@ public class ZplImageConverter
                 }
             }
         }
-        return ByteArrayToHex(bytes);
+        return bytes;
     }
 
     public static string CompressHex(string code, int widthBytes)

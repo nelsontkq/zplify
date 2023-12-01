@@ -1,22 +1,24 @@
-using System.Collections.Generic;
-using System.IO;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using System;
+using System.IO;
 using Xunit;
 
 namespace Zplify.Tests;
 public class GeneralTests
 {
-    [Fact]
-    public void CompressHex_CorrectlyCompressesHexString()
+
+    [Theory]
+    [ClassData(typeof(LabelLoader))]
+    public void Labels_CorrectlyCompress(string fileNameWithoutExtension)
     {
-        // Arrange
-        var input = "FFFFFFF00000000FFFFFFFFF0000000000FFFFFF";
-        int widthBytes = 10;
-        var expected = "MFN0KFJFP0KF";
 
-        var result = ZplImageConverter.CompressHex(input, widthBytes);
-
-        Assert.Equal(expected, result);
+        var image = Image.Load<Rgba32>(fileNameWithoutExtension + ".png");
+        ZplImageConverter.ScaleAndRotateImage(image, 800, 1200);
+        var hex = Convert.ToHexString(ZplImageConverter.GetImageBytes(image));
+        Assert.Equal(File.ReadAllText(fileNameWithoutExtension + ".hex"), hex);
+        var widthBytes = ZplImageConverter.GetImageWidthInBytes(image);
+        var compressed = ZplImageConverter.CompressHex(hex, widthBytes);
+        Assert.Equal(File.ReadAllText(fileNameWithoutExtension + ".compressed"), compressed);
     }
 }
